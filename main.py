@@ -1,7 +1,7 @@
 # Rename all the image files and create an image dataset
 import os, shutil, sys
 from enum import Enum
-from tkinter import filedialog
+from rename import RenameAndCopy
 from PyQt5.QtCore import QSize, QRect, Qt
 from PyQt5.QtWidgets import (QApplication, QGridLayout, QVBoxLayout, QHBoxLayout, QRadioButton,
                              QWidget, QFileDialog, QMainWindow, QTextEdit, QPushButton, QLabel,
@@ -22,48 +22,6 @@ class FoldersSelectOptions(Enum):
     ALL_FOLDERS_IN_PARENT = 2
 
 
-def copy_data_files(source_folder, destination_folder, string_prefix="", rename=True):
-    files_list = []
-    global _last_copied_file_id
-    relevant_file_count = 0
-
-    try:
-        files_list = os.listdir(source_folder)
-
-        # Sort the list alphabetically
-        files_list.sort()
-
-        for file_id in range(len(files_list)):
-            origin_path = os.path.join(source_folder, files_list[file_id])
-            destination_path = os.path.join(destination_folder, files_list[file_id])
-
-            split_file_name = os.path.splitext(files_list[file_id])
-
-            if (split_file_name[1] == '.jpg') or (split_file_name[1] == '.jpeg'):
-                relevant_file_count = relevant_file_count + 1
-
-                try:
-                    if not rename:
-                        shutil.copyfile(origin_path, destination_path)
-                    else:
-                        destination_file_id = _last_copied_file_id + file_id
-                        file_name = string_prefix + str(destination_file_id) + split_file_name[1]
-                        destination_path = os.path.join(destination_folder, file_name)
-                        shutil.copyfile(origin_path, destination_path)
-
-                except shutil.SameFileError:
-                    print(f"Same file name exist in the destination.")
-
-                except PermissionError:
-                    print(f"Permission denied.")
-
-    except:
-        print(f"Unknown Error!.")
-
-    finally:
-        _last_copied_file_id = relevant_file_count + 1
-
-
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -77,6 +35,44 @@ class MainWindow(QMainWindow):
         self.folders_list = []
         self.selected_folder_option = FoldersSelectOptions.CONTAIN_SUB_STRING
         self.generate_main_ui()
+
+    def create_folder_selection_ui_section(self):
+        grp_source_folder = QGroupBox("Source folder")
+
+        self.txt_source_path = QTextEdit()
+        self.txt_source_path.setFixedSize(QSize(400, 30))
+
+        btn_add_source_folders = QPushButton()
+        btn_add_source_folders.setText("+")
+        btn_add_source_folders.setFixedSize(QSize(60, 30))
+        btn_add_source_folders.clicked.connect(self.get_source_folders)
+
+        hbox_source_layout = QHBoxLayout()
+        hbox_source_layout.addWidget(self.txt_source_path)
+        hbox_source_layout.addWidget(btn_add_source_folders)
+
+        grp_source_folder.setLayout(hbox_source_layout)
+
+        # Destination folders
+        grp_destination_folder = QGroupBox("Destination Folder")
+
+        self.txt_destination_path = QTextEdit()
+        self.txt_destination_path.setFixedSize(QSize(400, 30))
+
+        btn_add_destination_folders = QPushButton()
+        btn_add_destination_folders.setText("+")
+        btn_add_destination_folders.setFixedSize(QSize(60, 30))
+        btn_add_destination_folders.clicked.connect(self.get_destination_folder)
+
+        hbox_destination_layout = QHBoxLayout()
+        hbox_destination_layout.addWidget(self.txt_destination_path)
+        hbox_destination_layout.addWidget(btn_add_destination_folders)
+
+        grp_destination_folder.setLayout(hbox_destination_layout)
+
+        self.hbox_folders = QHBoxLayout()
+        self.hbox_folders.addWidget(grp_source_folder)
+        self.hbox_folders.addWidget(grp_destination_folder)
 
     def create_options_ui_section(self):
 
@@ -113,39 +109,7 @@ class MainWindow(QMainWindow):
         self.setFixedSize(QSize(self.window_width, self.window_height))
 
         # Source folders
-        grp_source_folder = QGroupBox("Source folder")
-
-        self.txt_source_path = QTextEdit()
-        self.txt_source_path.setFixedSize(QSize(400, 30))
-
-        btn_add_source_folders = QPushButton()
-        btn_add_source_folders.setText("+")
-        btn_add_source_folders.setFixedSize(QSize(60, 30))
-        btn_add_source_folders.clicked.connect(self.get_source_folders)
-
-        hbox_source_layout = QHBoxLayout()
-        hbox_source_layout.addWidget(self.txt_source_path)
-        hbox_source_layout.addWidget(btn_add_source_folders)
-
-        grp_source_folder.setLayout(hbox_source_layout)
-
-        # Destination folders
-        grp_destination_folder = QGroupBox("Destination Folder")
-
-        self.txt_destination_path = QTextEdit()
-        self.txt_destination_path.setFixedSize(QSize(400, 30))
-
-        btn_add_destination_folders = QPushButton()
-        btn_add_destination_folders.setText("+")
-        btn_add_destination_folders.setFixedSize(QSize(60, 30))
-        btn_add_destination_folders.clicked.connect(self.get_destination_folder)
-
-        hbox_destination_layout = QHBoxLayout()
-        hbox_destination_layout.addWidget(self.txt_destination_path)
-        hbox_destination_layout.addWidget(btn_add_destination_folders)
-
-        grp_destination_folder.setLayout(hbox_destination_layout)
-
+        self.create_folder_selection_ui_section()
         self.create_options_ui_section()
 
         # Text box for all the files
@@ -156,12 +120,8 @@ class MainWindow(QMainWindow):
         hbox_selected_folders_layout.addWidget(self.txt_source_files)
         hbox_selected_folders_layout.addWidget(txt_renamed_files)
 
-        hbox_folders = QHBoxLayout()
-        hbox_folders.addWidget(grp_source_folder)
-        hbox_folders.addWidget(grp_destination_folder)
-
         main_ui_layout = QVBoxLayout()
-        main_ui_layout.addLayout(hbox_folders)
+        main_ui_layout.addLayout(self.hbox_folders)
 
         self.btn_rename_files = QPushButton()
         self.btn_rename_files.setText("Rename")
@@ -240,6 +200,9 @@ class MainWindow(QMainWindow):
 
         selected_data_folders_list = []
         selected_paths_string = ""
+
+        rename_folders = RenameAndCopy()
+
         try:
 
             if self.destination_path == "":
@@ -277,7 +240,7 @@ class MainWindow(QMainWindow):
                     for folder_id in range(len(selected_data_folders_list)):
                         print(f"Image folder : {selected_data_folders_list[folder_id]}")
 
-                        copy_data_files(selected_data_folders_list[folder_id], self.destination_path, "image", True)
+                        rename_folders.copy_data_files(selected_data_folders_list[folder_id], self.destination_path, "image", True)
 
             else:
                 print(f"No image sub folders in the source folder.")
